@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from src.rag.chain import query_rag
+from src.evaluation.metrics import log_query_metrics
 
 load_dotenv()
 
@@ -12,16 +13,31 @@ app = FastAPI(
     version     = "1.0.0"
 )
 
+# Table keyword mapping for metric logging
+TABLE_KEYWORDS = {
+    "stock":      "stock_levels",
+    "safety":     "stock_levels",
+    "material":   "material_master",
+    "reorder":    "stock_levels",
+    "purchase":   "purchase_orders",
+    "vendor":     "purchase_orders",
+    "customer":   "customer_master",
+    "revenue":    "sales_orders",
+    "order":      "sales_orders",
+    "region":     "sales_orders",
+}
+
+
+def infer_relevant_table(question: str) -> str:
+    q = question.lower()
+    for keyword, table in TABLE_KEYWORDS.items():
+        if keyword in q:
+            return table
+    return "sales_orders"
+
 
 class QueryRequest(BaseModel):
     question: str
-
-
-class SourceRecord(BaseModel):
-    record_id: str
-    table:     str
-    relevance: float
-    text:      str
 
 
 class QueryResponse(BaseModel):
@@ -41,6 +57,15 @@ def query(req: QueryRequest):
         raise HTTPException(status_code=400, detail="Question cannot be empty")
     try:
         result = query_rag(req.question)
+
+        # Log retrieval metrics to MLflow
+        log_query_metrics(
+            question       = req.question,
+            sources        = result["sources"],
+            relevant_table = infer_relevant_table(req.question),
+            answer_length  = len(result["answer"])
+        )
+
         return QueryResponse(
             question = result["question"],
             answer   = result["answer"],
