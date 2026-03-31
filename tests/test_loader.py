@@ -1,5 +1,8 @@
 import pandas as pd
+import pytest
 from pathlib import Path
+
+DATA_AVAILABLE = Path("data/sd/sales_orders_clean.csv").exists()
 
 
 def test_loader_imports():
@@ -15,6 +18,7 @@ def test_loader_imports():
     assert callable(load_purchase_orders)
 
 
+@pytest.mark.skipif(not DATA_AVAILABLE, reason="AdventureWorks data not available in CI")
 def test_clean_files_exist():
     assert Path("data/sd/sales_orders_clean.csv").exists()
     assert Path("data/sd/customer_master_clean.csv").exists()
@@ -23,6 +27,7 @@ def test_clean_files_exist():
     assert Path("data/mm/purchase_orders_clean.csv").exists()
 
 
+@pytest.mark.skipif(not DATA_AVAILABLE, reason="AdventureWorks data not available in CI")
 def test_sales_orders_columns():
     df = pd.read_csv("data/sd/sales_orders_clean.csv")
     assert "SalesOrderID" in df.columns
@@ -31,6 +36,7 @@ def test_sales_orders_columns():
     assert "CustomerID"   in df.columns
 
 
+@pytest.mark.skipif(not DATA_AVAILABLE, reason="AdventureWorks data not available in CI")
 def test_stock_levels_has_safety_flag():
     df = pd.read_csv("data/mm/stock_levels_clean.csv")
     assert "BelowSafety"  in df.columns
@@ -38,6 +44,7 @@ def test_stock_levels_has_safety_flag():
     assert df["BelowSafety"].sum() > 0
 
 
+@pytest.mark.skipif(not DATA_AVAILABLE, reason="AdventureWorks data not available in CI")
 def test_products_have_names():
     df = pd.read_csv("data/mm/product_master_clean.csv")
     assert "Name"          in df.columns
@@ -45,6 +52,7 @@ def test_products_have_names():
     assert df["Name"].notna().all()
 
 
+@pytest.mark.skipif(not DATA_AVAILABLE, reason="AdventureWorks data not available in CI")
 def test_purchase_orders_status_readable():
     df = pd.read_csv("data/mm/purchase_orders_clean.csv")
     assert "Status" in df.columns
