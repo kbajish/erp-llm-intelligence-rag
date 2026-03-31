@@ -5,15 +5,15 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-compose-blue)
 
-ERP LLM Intelligence is a Retrieval-Augmented Generation (RAG) system that enables natural language querying of SAP-structured ERP data across Sales & Distribution (SD) and Materials Management (MM) modules. Business users can ask questions like "What are the top 10 customers by revenue this quarter?" or "Which materials are below safety stock level?" and receive accurate, context-aware answers grounded in actual data rather than LLM hallucinations.
+ERP LLM Intelligence is a Retrieval-Augmented Generation (RAG) system that enables natural language querying of ERP data across Sales & Distribution (SD) and Materials Management (MM) modules. Business users can ask questions like "What are the top customers by order value?" or "Which products are below safety stock level?" and receive accurate, context-aware answers grounded in actual data rather than LLM hallucinations.
 
-Designed to enable faster, self-service business analytics, this system reduces dependency on manual reporting tools by allowing non-technical users to query ERP data using natural language. Synthetic SAP-like data is generated to mimic real-world ERP schemas while avoiding the use of proprietary or sensitive enterprise data.
+Built on the AdventureWorks dataset — a standard enterprise business database covering real sales orders, customers, products, inventory, and purchase orders. The system reduces dependency on manual reporting tools by allowing non-technical users to query ERP data using natural language.
 
 ---
 
 ## 🚀 Key Features
 
-- 📊 Synthetic SAP dataset generator (SD + MM modules with realistic schemas)
+- 📊 AdventureWorks dataset — real SD and MM ERP data (121K sales orders, 504 products, 19K customers)
 - 🧩 Table-aware chunking preserving column context for accurate retrieval
 - 🔍 Semantic search using embeddings (nomic-embed-text via Ollama)
 - 🗄 Persistent vector store using ChromaDB (no re-indexing on restart)
@@ -36,9 +36,9 @@ Traditional ERP reporting relies on structured queries or predefined dashboards,
 ## 🧠 System Architecture
 
 ```
-Synthetic SAP Data (SD + MM modules)
+AdventureWorks Dataset (SD + MM modules)
         ↓
-src/data/generator.py          — generates realistic ERP tables
+src/data/loader.py             — loads and cleans AdventureWorks CSVs
         ↓
 src/chunking/chunker.py        — table-aware chunking strategy
         ↓
@@ -61,11 +61,23 @@ src/evaluation/metrics.py      — MRR, Recall@5 → MLflow
 
 ## ⚙️ How It Works
 
-Synthetic ERP data representing SAP SD and MM modules is generated and structured into realistic business tables — sales orders, customer master, material master, stock levels, and purchase orders. The data is processed using a table-aware chunking strategy that preserves column relationships, ensuring semantic meaning is retained during retrieval.
+AdventureWorks ERP data covering SD and MM modules is loaded, cleaned, and structured into five business tables — sales orders, customer master, product master, stock levels, and purchase orders. The loader normalises dates, maps status codes to readable labels, joins related tables (e.g. sales orders enriched with product names), and saves clean CSVs ready for chunking.
 
-Chunks are embedded using a local embedding model (nomic-embed-text via Ollama) and stored in a persistent ChromaDB vector database. When a user submits a query, the system retrieves the most relevant records and passes them to llama3.2 via a LangChain RAG chain. The LLM generates a response grounded in the retrieved context, along with source references showing exactly which records were used.
+The data is processed using a table-aware chunking strategy that preserves column relationships, ensuring semantic meaning is retained during retrieval. Chunks are embedded using a local embedding model (nomic-embed-text via Ollama) and stored in a persistent ChromaDB vector database. When a user submits a query, the system retrieves the most relevant records and passes them to llama3.2 via a LangChain RAG chain. The LLM generates a response grounded in the retrieved context, along with source references showing exactly which records were used.
 
 Retrieval quality metrics (MRR and Recall@5) are logged to MLflow after each query, enabling ongoing evaluation of the RAG pipeline.
+
+---
+
+## 📊 Dataset Overview
+
+| Table | Source | Rows | Description |
+|---|---|---|---|
+| Sales orders | SalesOrderHeader + SalesOrderDetail + Product | 121,317 | Orders with product names, quantities, values |
+| Customer master | Customer | 19,820 | Customer accounts and territories |
+| Product master | Product | 504 | Products with safety stock and reorder points |
+| Stock levels | ProductInventory + Product | 432 | Current stock vs safety stock per product |
+| Purchase orders | PurchaseOrderHeader + PurchaseOrderDetail | 8,845 | Vendor orders with status and quantities |
 
 ---
 
@@ -85,7 +97,7 @@ The Streamlit dashboard provides:
 
 | Layer | Tool |
 |---|---|
-| Data generation | Python (Faker, pandas) |
+| Dataset | AdventureWorks (Microsoft open dataset) |
 | Embeddings | nomic-embed-text (Ollama) |
 | Vector store | ChromaDB (persistent, local) |
 | RAG orchestration | LangChain |
@@ -104,20 +116,27 @@ The Streamlit dashboard provides:
 ```
 erp-llm-intelligence-rag/
 │
-├── data/                          # Generated ERP CSV files (not committed)
+├── data/                          # ERP CSV files (not committed)
 │   ├── sd/                        # Sales & Distribution tables
-│   │   ├── sales_orders.csv
-│   │   └── customer_master.csv
+│   │   ├── SalesOrderHeader.csv   # Raw AdventureWorks files
+│   │   ├── SalesOrderDetail.csv
+│   │   ├── Customer.csv
+│   │   ├── sales_orders_clean.csv # Cleaned output from loader
+│   │   └── customer_master_clean.csv
 │   └── mm/                        # Materials Management tables
-│       ├── material_master.csv
-│       ├── stock_levels.csv
-│       └── purchase_orders.csv
+│       ├── Product.csv            # Raw AdventureWorks files
+│       ├── ProductInventory.csv
+│       ├── PurchaseOrderHeader.csv
+│       ├── PurchaseOrderDetail.csv
+│       ├── product_master_clean.csv  # Cleaned output from loader
+│       ├── stock_levels_clean.csv
+│       └── purchase_orders_clean.csv
 │
 ├── chroma_db/                     # ChromaDB persistent store (not committed)
 │
 ├── src/
 │   ├── data/
-│   │   └── generator.py           # Synthetic SAP data generator
+│   │   └── loader.py              # AdventureWorks data loader + cleaner
 │   ├── chunking/
 │   │   └── chunker.py             # Table-aware chunking logic
 │   ├── embeddings/
@@ -137,15 +156,13 @@ erp-llm-intelligence-rag/
 │
 ├── tests/
 │   ├── test_imports.py            # CI-safe import tests
-│   └── test_generator.py          # Data generator smoke tests
+│   └── test_generator.py          # Data loader smoke tests
 │
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                 # GitHub Actions pipeline
 │
 ├── mlruns/                        # MLflow tracking (not committed)
-├── .dvc/
-├── dvc.yaml
 ├── docker-compose.yml
 ├── Dockerfile.api
 ├── Dockerfile.dashboard
@@ -174,22 +191,30 @@ python -m venv .venv
 source .venv/bin/activate     # Linux/Mac
 ```
 
-### 3. Generate synthetic ERP data
-```bash
-python -m src.data.generator
+### 3. Download AdventureWorks CSV files
+Download the following files from the [AdventureWorks repository](https://github.com/Microsoft/sql-server-samples/tree/master/samples/databases/adventure-works/oltp-install-script) and place them in `data/sd/` and `data/mm/`:
+
+```
+data/sd/  → SalesOrderHeader.csv, SalesOrderDetail.csv, Customer.csv
+data/mm/  → Product.csv, ProductInventory.csv, PurchaseOrderHeader.csv, PurchaseOrderDetail.csv
 ```
 
-### 4. Ingest data into ChromaDB
+### 4. Load and clean the data
+```bash
+python -m src.data.loader
+```
+
+### 5. Ingest data into ChromaDB
 ```bash
 python -m src.embeddings.ingest
 ```
 
-### 5. Start all services
+### 6. Start all services
 ```bash
 docker compose up --build
 ```
 
-### 6. Access services
+### 7. Access services
 
 | Service   | URL                        |
 |-----------|----------------------------|
