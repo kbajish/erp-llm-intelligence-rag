@@ -9,6 +9,8 @@ ERP LLM Intelligence is a Retrieval-Augmented Generation (RAG) system that enabl
 
 Built on the AdventureWorks dataset — a standard enterprise business database covering real sales orders, customers, products, inventory, and purchase orders. The system reduces dependency on manual reporting tools by allowing non-technical users to query ERP data using natural language.
 
+This project demonstrates the architecture and retrieval patterns of an ERP-integrated RAG system. It is intended as a reference implementation and learning resource, not a deployment-ready system.
+
 ---
 
 ## 🚀 Key Features
@@ -156,7 +158,7 @@ erp-llm-intelligence-rag/
 │
 ├── tests/
 │   ├── test_imports.py            # CI-safe import tests
-│   └── test_generator.py          # Data loader smoke tests
+│   └── test_loader.py             # Data loader smoke tests
 │
 ├── .github/
 │   └── workflows/
@@ -234,7 +236,7 @@ docker compose up --build
 
 ---
 
-## 📈 Future Improvements
+## 📈 Possible Extensions
 
 - Hybrid retrieval (BM25 + dense embeddings) for better recall
 - Fine-tuned embedding model on ERP-specific terminology
@@ -246,4 +248,4 @@ docker compose up --build
 
 ## 👤 Author
 
-Experienced IT professional with a background in development, cybersecurity, and ERP systems, with expertise in Industrial AI. Focused on building production-ready AI systems with explainability, LLM integration, and MLOps best practices.
+Experienced IT professional with a background in development, cybersecurity, and ERP systems, with expertise in Industrial AI. Focused on building well-engineered AI systems with explainability, LLM integration, and MLOps practices.
