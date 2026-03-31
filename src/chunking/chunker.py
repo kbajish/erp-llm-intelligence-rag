@@ -11,56 +11,47 @@ MM_DIR = Path("data/mm")
 
 
 def row_to_text(row: pd.Series, table_name: str) -> str:
-    """Convert a single DataFrame row to a human-readable text chunk."""
     fields = " | ".join([f"{col}: {val}" for col, val in row.items()])
     return f"[{table_name}] {fields}"
 
 
-def chunk_table(df: pd.DataFrame, table_name: str) -> List[Dict]:
-    """
-    Table-aware chunking — each row becomes one chunk.
-    Column names are preserved in every chunk so the retriever
-    always knows what each value means.
-    """
+def chunk_table(df: pd.DataFrame, table_name: str,
+                id_col: str = None) -> List[Dict]:
     chunks = []
     for _, row in df.iterrows():
-        text = row_to_text(row, table_name)
-        metadata = {
-            "table":  table_name,
-            "source": f"{table_name} record"
-        }
-        # Add key identifier to metadata for source citation
-        if "order_id" in row:
-            metadata["record_id"] = row["order_id"]
-        elif "material_id" in row:
-            metadata["record_id"] = row["material_id"]
-        elif "customer_id" in row:
-            metadata["record_id"] = row["customer_id"]
-        elif "po_id" in row:
-            metadata["record_id"] = row["po_id"]
-
+        text     = row_to_text(row, table_name)
+        metadata = {"table": table_name, "source": f"{table_name} record"}
+        if id_col and id_col in row:
+            metadata["record_id"] = str(row[id_col])
         chunks.append({"text": text, "metadata": metadata})
     return chunks
 
 
 def load_and_chunk_all() -> List[Dict]:
-    log.info("Loading and chunking all ERP tables...")
+    log.info("Loading and chunking AdventureWorks tables...")
     all_chunks = []
 
     tables = {
-        "sales_orders":    SD_DIR / "sales_orders.csv",
-        "customer_master": SD_DIR / "customer_master.csv",
-        "material_master": MM_DIR / "material_master.csv",
-        "stock_levels":    MM_DIR / "stock_levels.csv",
-        "purchase_orders": MM_DIR / "purchase_orders.csv",
+        "sales_orders":    (SD_DIR / "sales_orders_clean.csv",    "SalesOrderID"),
+        "customer_master": (SD_DIR / "customer_master_clean.csv", "CustomerID"),
+        "product_master":  (MM_DIR / "product_master_clean.csv",  "ProductID"),
+        "stock_levels":    (MM_DIR / "stock_levels_clean.csv",    "ProductID"),
+        "purchase_orders": (MM_DIR / "purchase_orders_clean.csv", "PurchaseOrderID"),
     }
 
-    for table_name, path in tables.items():
+    for table_name, (path, id_col) in tables.items():
         if not path.exists():
             log.warning(f"File not found: {path}")
             continue
-        df     = pd.read_csv(path)
-        chunks = chunk_table(df, table_name)
+
+        df = pd.read_csv(path)
+
+        # Sample large tables to keep embedding manageable
+        if len(df) > 2000:
+            log.info(f"  Sampling {table_name} from {len(df)} to 2000 rows")
+            df = df.sample(2000, random_state=42).reset_index(drop=True)
+
+        chunks = chunk_table(df, table_name, id_col)
         all_chunks.extend(chunks)
         log.info(f"  {table_name}: {len(chunks)} chunks")
 
